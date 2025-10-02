@@ -1,3 +1,3 @@
-rootProject.name = "spring-multi-module"
+rootProject.name = "project-v1"
 
 include("core", "api")

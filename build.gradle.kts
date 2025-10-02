@@ -1,11 +1,13 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 
 plugins {
-	id("org.springframework.boot") version "3.2.8" apply false
+	id("org.springframework.boot") version "3.5.5" apply false
 	id("io.spring.dependency-management") version "1.1.6"
-	kotlin("plugin.jpa") version "1.9.24"
-	kotlin("jvm") version "1.9.24"
-	kotlin("plugin.spring") version "1.9.24" apply false
+	kotlin("plugin.jpa") version "2.2.20"
+	kotlin("jvm") version "2.2.20"
+	kotlin("plugin.spring") version "2.2.20" apply false
 }
 
 allprojects {
@@ -19,7 +21,7 @@ allprojects {
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
@@ -32,15 +34,17 @@ subprojects {
 	apply(plugin = "io.spring.dependency-management")
 
 	java {
-		sourceCompatibility = JavaVersion.VERSION_17
+		sourceCompatibility = JavaVersion.VERSION_21
 	}
 
-	tasks.withType<KotlinCompile> {
-		kotlinOptions {
-			freeCompilerArgs += "-Xjsr305=strict"
-			jvmTarget = "17"
-		}
-	}
+
+    tasks.withType<KotlinCompile>().configureEach {
+        compilerOptions {
+            freeCompilerArgs.add("-Xjsr305=strict")
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
+
 
 	configurations {
 		compileOnly {
