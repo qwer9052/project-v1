@@ -4,13 +4,24 @@ plugins {
 }
 
 springBoot {
-    mainClass.set("io.cloudtype.api.ApiApplicationKt")
+    mainClass.set("com.project.api.ApiApplicationKt")
 }
 
 dependencies {
     implementation(project(":core"))
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    runtimeOnly("com.h2database:h2")
+    implementation(project(":domain"))
+    implementation("org.postgresql:postgresql")
+
+    // Kotlin 코루틴 기본
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+
+    // Spring과 코루틴 통합
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+
+    // WebFlux 기반 비동기 처리 시 필요
+
+
+
 }
 
 tasks.test {
