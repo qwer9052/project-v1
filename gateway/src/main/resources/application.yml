@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: message-route
+              uri: http://localhost:8081
+              predicates:
+                - Path=/message/**
+              filters:
+#                - StripPrefix=1
+              metadata:
+                cors:
+                  allowedOrigins:
+                    - http://localhost:3000
+                  allowedMethods:
+                    - GET
+                    - POST
+                    - PUT
+                    - DELETE
+                    - OPTIONS
+                  allowedHeaders:
+                    - '*'
+                  allowCredentials: true
+                  maxAge: 3600
