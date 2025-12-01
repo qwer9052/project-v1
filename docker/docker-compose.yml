@@ -15,6 +15,7 @@ services:
     networks:
       - keycloak_network
 
+
   nginx:
     image: nginx:latest
     container_name: nginx_proxy
@@ -24,6 +25,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./cert/fullchain.pem:/etc/nginx/cert/fullchain.pem:ro
+      - ./cert/privkey.pem:/etc/nginx/cert/privkey.pem:ro
     depends_on:
       - keycloak
     networks:
@@ -32,26 +35,29 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.0
     container_name: keycloak_web
-    command: start-dev
+    command:
+      - start
+      - --http-enabled=true          # HTTP 활성화 (Nginx에서 TLS 처리)
+      - --hostname=ron-site.iptime.org
+      - --hostname-strict=false
+      - --proxy-headers=xforwarded
     environment:
+      KC_PROXY: edge
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: admin
       KC_DB_PASSWORD: admin
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
       KC_LOG_LEVEL: info
       KC_METRICS_ENABLED: true
       KC_HEALTH_ENABLED: true
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-
     ports:
       - "8080:8080"
     depends_on:
       - postgres
     networks:
+
       - keycloak_network
 
 volumes:

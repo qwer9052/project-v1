@@ -2,6 +2,20 @@ server:
   port: 8080
 
 spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            # Keycloak 발급자(iss)와 정확히 일치
+            issuer-uri: http://ron-site.iptime.org/realms/test
+        registration:
+          keycloak:
+            client-id: gateway
+            client-secret: wD4qqEdBqRRjrACnZugb9Rq8ZCvJeXWh
+            authorization-grant-type: authorization_code
+            scope: openid, profile
+
   cloud:
     gateway:
       server:

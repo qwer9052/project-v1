@@ -19,5 +19,8 @@ dependencies {
     kapt("org.springframework.boot:spring-boot-configuration-processor") // Kotlin Annotation Processing을 쓰는 경우
     implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+
 }
 
