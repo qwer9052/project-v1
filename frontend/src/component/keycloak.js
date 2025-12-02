@@ -1,7 +1,7 @@
 import Keycloak from "keycloak-js";
 
 const keycloak = new Keycloak({
-    url: "https://ron-site.iptime.org/",
+    url: "http://ron-site.iptime.org/",
     realm: "test",
     clientId: "account"
 });

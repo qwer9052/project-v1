@@ -2,6 +2,29 @@ server:
   port: 8081
 
 spring:
+  rsocket:
+    server:
+      transport: websocket
+      mapping-path: /rsocket
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      # 브로드캐스트 목적이면 인스턴스마다 서로 다른 group-id 사용
+      group-id: chat-consumer-${random.uuid}
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://ron-site.iptime.org/realms/test
+          # 또는 jwk-set-uri를 직접 지정:
+
   datasource:
     url: jdbc:postgresql://localhost:5432/message
     username: admin
@@ -24,3 +47,9 @@ spring:
     idle-timeout: 30000
     connection-timeout: 20000
     max-lifetime: 1800000
+
+logging:
+  level:
+    org.springframework.messaging.rsocket: DEBUG   # Spring RSocket 메시징
+    io.rsocket: DEBUG                               # RSocket 프레임/프로토콜
+    reactor.netty.http.server: DEBUG                # WebSocket 업그레이드/네트워크
