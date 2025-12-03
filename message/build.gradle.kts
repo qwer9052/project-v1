@@ -12,6 +12,7 @@ springBoot {
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-rsocket")
+
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     // Kafka

@@ -11,6 +11,7 @@ const App = () => {
     const [authenticated, setAuthenticated] = useState(false);
 
     const [selectedChannel, setSelectedChannel] = useState([]);
+    const [user, setUser] = useState({});
 
     useEffect(() => {
         keycloak.init({ onLoad: "check-sso" }).then(auth => {
@@ -58,11 +59,13 @@ const App = () => {
             cancelToken: source.token,
         };
 
-        // me 호출
+        //me 호출
         axios
             .get("http://localhost:8081/me", commonConfig)
             .then((res) => {
-                console.log("me:", res.data);
+                // console.log("me:", res.data);
+                setUser(res.data);
+                console.log(user);
             })
             .catch((err) => {
                 if (!axios.isCancel(err)) {
@@ -90,6 +93,12 @@ const App = () => {
         };
     }, [authenticated]); // ✅ 의존성: authenticated
 
+    useEffect(() => {
+        console.log(user)
+
+        return () => {
+        };
+    }, [user]); // ✅ 의존성: authenticated
 
     if (!authenticated) {
         return <div style={{ textAlign: "center", marginTop: "50px" }}>
@@ -102,7 +111,7 @@ const App = () => {
             <ChannelList channels={selectedChannel} onSelectChannel={setSelectedChannel} />
             <MainContainer style={{width:'100vw', display:"flex", flexDirection : 'column'}}>
                 <Channel style={{color : '#000'}} channel={selectedChannel} />
-                <ChatRoom roomId="roomA" senderId="namju" />
+                <ChatRoom roomId="roomA" senderId={user.username} />
                 {/*<ChatContainer>*/}
                 {/*    <MessageList>*/}
                 {/*        <Message model={{*/}

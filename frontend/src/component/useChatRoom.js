@@ -1,133 +1,163 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {
+    BufferEncoders,
     encodeCompositeMetadata,
     encodeRoute,
-    JsonSerializers,
     MESSAGE_RSOCKET_COMPOSITE_METADATA,
     MESSAGE_RSOCKET_ROUTING,
     RSocketClient,
 } from "rsocket-core";
 import RSocketWebSocketClient from "rsocket-websocket-client";
 
-const JSON_MIME = "application/json";
-const COMPOSITE_MIME = MESSAGE_RSOCKET_COMPOSITE_METADATA.string;
+/** 직렬화기: Buffer/문자열 그대로 통과 */
+const IdentitySerializer = {
+    serialize: (data) => data,
+    deserialize: (data) => data,
+};
 
-function createRoutingMetadata(route) {
-    const routeBuffer = encodeRoute(route);
-    return encodeCompositeMetadata([
-        [MESSAGE_RSOCKET_ROUTING, routeBuffer]
-    ]);
-}
+/** 객체 → JSON → Buffer */
+const toJsonBuffer = (obj) => Buffer.from(JSON.stringify(obj), "utf8");
 
-export function useChatRoom(roomId, senderId, { url = "ws://localhost:8081/rsocket" } = {}) {
+/** Uint8Array → Buffer */
+const toBuffer = (u8) => Buffer.from(u8);
+
+export function useChatRoom(
+    roomId,
+    senderId,
+    { url = "ws://localhost:8081/rsocket" } = {}
+) {
     const [messages, setMessages] = useState([]);
     const socketRef = useRef(null);
     const channelSubscriberRef = useRef(null);
 
+    const route = `room.${roomId}`;
+    // 라우팅 메타데이터
+    const routeMetadataU8 = encodeCompositeMetadata([
+        [MESSAGE_RSOCKET_ROUTING, encodeRoute(route)],
+    ]);
+    const routeMetadataBuf = toBuffer(routeMetadataU8);
+
     useEffect(() => {
-        const TransportCtor = RSocketWebSocketClient.default || RSocketWebSocketClient;
-        const transport = new TransportCtor({ url });
+        console.log(`[Client] 🔌 ${url}에 연결 중...`);
+
+        const TransportCtor = RSocketWebSocketClient?.default || RSocketWebSocketClient;
+        const transport = new TransportCtor({ url }, BufferEncoders);
 
         const client = new RSocketClient({
             setup: {
-                keepAlive: 10000,
+                keepAlive: 100000,
                 lifetime: 180000,
-                dataMimeType: JSON_MIME,
-                metadataMimeType: COMPOSITE_MIME,
+                dataMimeType: "application/json",
+                metadataMimeType: MESSAGE_RSOCKET_COMPOSITE_METADATA.string,
             },
-            serializers: JsonSerializers,
+            serializers: {
+                data: IdentitySerializer,
+                metadata: IdentitySerializer,
+            },
             transport,
         });
 
         const sub = client.connect().subscribe({
             onComplete: (socket) => {
                 socketRef.current = socket;
-                console.log("[RSocket] Connected");
+                console.log("[Client] ✅ RSocket 연결됨");
 
-                const route = `chat.${roomId}`;
-                console.log(`[RSocket] Starting channel for: ${route}`);
-
-                const metadata = createRoutingMetadata(route);
-                let isFirstMessage = true;
-
+                // 🔹 Publisher: 클라이언트 → 서버 메시지 스트림
                 const publisher = {
                     subscribe: (subscriber) => {
-                        console.log("[Publisher] Server subscribed");
-
+                        console.log("[Client] 📤 Publisher 구독됨");
                         channelSubscriberRef.current = subscriber;
 
                         subscriber.onSubscribe({
                             request: (n) => {
-                                console.log(`[Publisher] Server requested ${n}`);
-
-                                // 서버가 request하면 즉시 첫 메시지 전송 (메타데이터 포함)
-                                if (isFirstMessage && n > 0) {
-                                    isFirstMessage = false;
-                                    console.log("[Publisher] Sending first message with metadata");
-
-                                    subscriber.onNext({
-                                        data: {
-                                            roomId,
-                                            senderId,
-                                            message: "[INIT]",
-                                            timestamp: new Date().toISOString()
-                                        },
-                                        metadata: metadata  // ✅ 첫 메시지에 메타데이터 포함
-                                    });
-                                }
+                                console.log(`[Client] 📥 서버가 ${n}개 요청함`);
                             },
                             cancel: () => {
-                                console.log("[Publisher] Cancelled");
+                                console.log("[Client] ❌ 채널 취소됨");
                                 channelSubscriberRef.current = null;
                             },
                         });
-                    }
+
+                        // 초기 메시지: 라우팅 메타데이터 포함
+                        console.log(`[Client] 🚀 초기 메시지 전송: room=${roomId}`);
+                        subscriber.onNext({
+                            metadata: routeMetadataBuf,
+                            data: toJsonBuffer({
+                                roomId: roomId,
+                                senderId,
+                                message: senderId,
+                                timestamp: new Date().toISOString(),
+                            }),
+                        });
+                    },
                 };
 
-                console.log("[RSocket] Calling requestChannel");
-
-                // requestChannel 호출 - publisher만 전달
+                // 🔹 채널 오픈: requestChannel으로 양방향 통신 시작
+                console.log(`[Client] 📡 채널 오픈: room=${roomId}`);
                 const channel = socket.requestChannel(publisher);
 
                 channel.subscribe({
                     onSubscribe: (subscription) => {
-                        console.log("[Channel] Subscribed to responses");
+                        // console.log("[Client] ✅ 채널 구독 완료");
+                        // 서버에서 무제한으로 메시지 요청
                         subscription.request(2147483647);
                     },
+
                     onNext: (payload) => {
-                        console.log("[Channel] ✅ Received:", payload.data);
-                        if (payload?.data) {
-                            setMessages((prev) => [...prev, payload.data]);
+                        // console.log("[Client] 📨 메시지 수신:", payload);
+                        const u8 = payload?.data;
+                        if (u8 == null) {
+                            console.warn("[Client] ⚠️ data 없음");
+                            return;
+                        }
+
+                        try {
+                            const text =
+                                typeof u8 === "string"
+                                    ? u8
+                                    : new TextDecoder().decode(u8);
+                            const msg =
+                                typeof text === "string"
+                                    ? JSON.parse(text)
+                                    : text;
+
+                            // console.log("[Client] ✅ 파싱 완료:", msg);
+                            setMessages((prev) => [...prev, msg]);
+                        } catch (e) {
+                            console.warn("[Client] ❌ 파싱 실패:", e);
+                            setMessages((prev) => [...prev, { raw: u8 }]);
                         }
                     },
+
                     onError: (err) => {
-                        console.error("[Channel] ❌ Error:", err);
-                        if (err.source) {
-                            console.error("[Channel] Error source:", err.source);
-                        }
+                        console.error("[Client] ❌ 채널 오류:", err);
                     },
+
                     onComplete: () => {
-                        console.log("[Channel] Completed");
+                        console.log("[Client] 🔌 채널 종료");
                     },
                 });
             },
+
             onError: (err) => {
-                console.error("[RSocket] Connection error:", err);
+                console.error("[Client] ❌ 연결 오류:", err);
             },
         });
 
         return () => {
-            console.log("[RSocket] Cleanup");
-            if (channelSubscriberRef.current) {
-                try {
-                    channelSubscriberRef.current.onComplete();
-                } catch (e) {}
-            }
+            console.log("[Client] 🧹 정리 중...");
+            try {
+                channelSubscriberRef.current?.onComplete();
+            } catch (_) {}
             channelSubscriberRef.current = null;
-            sub.cancel();
+
+            try {
+                sub.cancel();
+            } catch (_) {}
+
             try {
                 socketRef.current?.close();
-            } catch (e) {}
+            } catch (_) {}
             socketRef.current = null;
         };
     }, [url, roomId, senderId]);
@@ -135,28 +165,28 @@ export function useChatRoom(roomId, senderId, { url = "ws://localhost:8081/rsock
     const send = useCallback(
         (text) => {
             if (!channelSubscriberRef.current) {
-                console.error("[Send] Channel not ready");
+                console.error("[Client] ❌ 채널이 준비되지 않음");
                 return;
             }
 
-            console.log("[Send] Sending:", text);
+            console.log("[Client] 📨 메시지 전송:", text);
 
             try {
                 channelSubscriberRef.current.onNext({
-                    data: {
+                    metadata: routeMetadataBuf,
+                    data: toJsonBuffer({
                         roomId,
                         senderId,
                         message: text,
-                        timestamp: new Date().toISOString()
-                    }
-                    // 이후 메시지는 metadata 없음
+                        timestamp: new Date().toISOString(),
+                    }),
                 });
-                console.log("[Send] ✅ Sent");
+                console.log("[Client] ✅ 전송 완료");
             } catch (err) {
-                console.error("[Send] ❌ Error:", err);
+                console.error("[Client] ❌ 전송 오류:", err);
             }
         },
-        [roomId, senderId]
+        [roomId, senderId, routeMetadataBuf]
     );
 
     return { messages, send };

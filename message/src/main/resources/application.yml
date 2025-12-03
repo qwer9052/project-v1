@@ -50,6 +50,7 @@ spring:
 
 logging:
   level:
-    org.springframework.messaging.rsocket: DEBUG   # Spring RSocket 메시징
+    org.springframework.messaging.rsocket: TRACE   # Spring RSocket 메시징
     io.rsocket: DEBUG                               # RSocket 프레임/프로토콜
     reactor.netty.http.server: DEBUG                # WebSocket 업그레이드/네트워크
+
