@@ -16,6 +16,11 @@ class MessageController {
         return "test"
     }
 
+    @GetMapping("/test2")
+    fun test2(): String {
+        return "test2"
+    }
+
     @GetMapping("/me")
     fun me(@AuthenticationPrincipal jwt: org.springframework.security.oauth2.jwt.Jwt): Map<String, Any?> {
         val realmRoles = (jwt.claims["realm_access"] as? Map<*, *>)?.get("roles")
